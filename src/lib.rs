@@ -3,6 +3,7 @@ pub mod column;
 pub mod frame;
 pub mod pit;
 pub mod renderer;
+pub mod terminal;
 pub mod timer;
 
 const NUM_COLS: usize = 6;
