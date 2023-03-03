@@ -54,6 +54,8 @@ pub fn init(stdout: &mut Stdout, frame: &Frame) -> crossterm::Result<()> {
         }
     }
 
+    stdout.flush()?;
+
     Ok(())
 }
 

@@ -17,15 +17,31 @@ use std::{
     time::{Duration, Instant},
 };
 
+struct TerminalGuard;
+
+impl TerminalGuard {
+    fn create() -> TerminalGuard {
+        let mut stdout = io::stdout();
+        enable_raw_mode().unwrap();
+        stdout.execute(EnterAlternateScreen).unwrap();
+        stdout.execute(Hide).unwrap();
+        TerminalGuard
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let mut stdout = io::stdout();
+        stdout.execute(LeaveAlternateScreen).unwrap();
+        stdout.execute(Show).unwrap();
+        disable_raw_mode().unwrap();
+    }
+}
+
 fn main() -> Result<()> {
     assert_screen_size().expect("Failed when asserting the screen size requirements");
-
-    // Terminal
-    let mut stdout = io::stdout();
-
-    enable_raw_mode()?;
-    stdout.execute(EnterAlternateScreen)?.execute(Hide)?;
-
+    // Drop guard for terminal setup and cleanup
+    let mut _t = TerminalGuard::create();
     // Render loop in a separate thread
     let (render_tx, render_rx) = mpsc::channel::<Frame>();
     thread::spawn(move || -> Result<()> {
@@ -95,10 +111,6 @@ fn main() -> Result<()> {
 
         thread::sleep(fps_duration.saturating_sub(instant.elapsed()));
     }
-
-    // Cleanup
-    stdout.execute(Show)?.execute(LeaveAlternateScreen)?;
-    disable_raw_mode()?;
 
     Ok(())
 }

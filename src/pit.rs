@@ -297,15 +297,10 @@ impl Pit {
 
         match &self.state.stage {
             Stable => {
-                self.state.move_timer.update(delta);
-
-                if self.state.move_timer.ready {
-                    if let Some(origins) = column.landing(&mut self.heap) {
-                        self.active_origins = origins;
-                        self.state.stage = Matching;
-                    } else {
-                        self.state.move_timer.reset();
-                    }
+                if let Some(origins) = column.detect_landing(&mut self.heap, delta) {
+                    self.active_origins = origins;
+                    self.state.stage = Matching;
+                    self.state.move_timer.finish();
                 }
             }
             Matching => {
@@ -400,8 +395,6 @@ mod test {
     mod test_stage_transition {
         use super::*;
 
-        const DELTA: Duration = Duration::from_millis(0);
-
         #[test]
         fn test_update_stable_stage() {
             let mut pit = Pit::new();
@@ -417,8 +410,7 @@ mod test {
                 col.move_down(&pit.heap);
             }
 
-            pit.update(&mut col, DELTA);
-            pit.update(&mut col, DELTA);
+            pit.update(&mut col, Duration::from_millis(0));
 
             assert!(pit.stable());
         }
@@ -437,7 +429,7 @@ mod test {
             for _ in 1..NUM_ROWS {
                 col.move_down(&pit.heap);
             }
-            pit.update(&mut col, DELTA);
+            pit.update(&mut col, Duration::from_millis(Column::MOVE_MILLIS));
 
             assert!(!pit.stable());
         }

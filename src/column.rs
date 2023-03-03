@@ -75,26 +75,31 @@ impl Column {
         }
     }
 
-    pub fn landing(&mut self, heap: &mut Heap) -> Option<Vec<Vec2>> {
-        // Reached the bottom of the pit or there is a upcoming hit with an existing block
-        // in both cases we copy the blocks into our matrix of blocks
+    pub fn detect_landing(&mut self, heap: &mut Heap, delta: Duration) -> Option<Vec<Vec2>> {
         if self.detect_hit_downwards(heap) {
-            self.dropping = false;
-            // transfer shaft block to heap of blocks
-            let mut origins = Vec::new();
-            for (i, block) in self.shaft.into_iter().rev().enumerate() {
-                if i > self.y {
-                    // y points to the base block, if any above it are out of the matrix, stop transfer to teh heap.
-                    break;
+            // reached the bottom of the pit or there is a upcoming hit with an existing block
+            let mut move_timer_copy = self.move_timer;
+            move_timer_copy.update(delta);
+            // we will be ready when the timer finishes, to give the player
+            // the chance to cycle the column before we have fully landed
+            if move_timer_copy.ready {
+                // now that we have landed, we copy the blocks into our matrix of blocks
+                self.dropping = false;
+                // transfer shaft block to heap of blocks
+                let mut origins = Vec::new();
+                for (i, block) in self.shaft.into_iter().rev().enumerate() {
+                    if i > self.y {
+                        // y points to the base block, if any above it are out of the matrix, stop transfer to teh heap.
+                        break;
+                    }
+                    let origin = Vec2::xy(self.x, self.y - i);
+                    heap[origin.x][origin.y] = block;
+                    origins.push(origin);
                 }
-                let origin = Vec2::xy(self.x, self.y - i);
-                heap[origin.x][origin.y] = block;
-                origins.push(origin);
+                return Some(origins);
             }
-            Some(origins)
-        } else {
-            None
         }
+        None
     }
 
     pub fn update(&mut self, heap: &Heap, delta: Duration) -> bool {
@@ -158,6 +163,8 @@ mod test {
         Vec2, NUM_ROWS, STARTING_X, STARTING_Y,
     };
 
+    const DELTA: Duration = Duration::from_millis(Column::MOVE_MILLIS);
+
     #[test]
     fn test_new() {
         let col = Column::new();
@@ -205,8 +212,10 @@ mod test {
         let heap = Pit::new_heap(None);
         let mut col = Column::new();
 
-        assert!(!col.update(&heap, Duration::from_millis(Column::MOVE_MILLIS - 1)));
-        assert!(col.update(&heap, Duration::from_millis(1)));
+        col.update(&heap, Duration::from_millis(Column::MOVE_MILLIS - 1));
+        assert_eq!(col.y, 0);
+        col.update(&heap, Duration::from_millis(1));
+        assert_eq!(col.y, 1);
     }
 
     #[test]
@@ -214,12 +223,12 @@ mod test {
         let mut heap: Heap = Pit::new_heap(None);
         let mut col = Column::new();
 
-        assert_eq!(col.landing(&mut heap), None);
+        assert_eq!(col.detect_landing(&mut heap, DELTA), None);
 
         heap[STARTING_X][STARTING_Y + 1] = Block::new(Some(BlockKind::Blue));
 
         assert_eq!(
-            col.landing(&mut heap),
+            col.detect_landing(&mut heap, DELTA),
             Some(vec![Vec2::xy(STARTING_X, STARTING_Y)])
         );
     }
@@ -229,14 +238,14 @@ mod test {
         let mut heap: Heap = Pit::new_heap(None);
         let mut col = Column::new();
 
-        assert_eq!(col.landing(&mut heap), None);
+        assert_eq!(col.detect_landing(&mut heap, DELTA), None);
 
         for _ in 1..NUM_ROWS {
             col.move_down(&heap);
         }
 
         assert_eq!(
-            col.landing(&mut heap),
+            col.detect_landing(&mut heap, DELTA),
             Some(vec![
                 Vec2::xy(STARTING_X, NUM_ROWS - 1),
                 Vec2::xy(STARTING_X, NUM_ROWS - 2),

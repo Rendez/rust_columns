@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Timer {
     pub ready: bool,
     millis: u64,
@@ -19,6 +19,10 @@ impl Timer {
     pub fn update(&mut self, delta: Duration) {
         self.duration = self.duration.saturating_sub(delta);
         self.ready = self.duration.is_zero();
+    }
+
+    pub fn finish(&mut self) {
+        self.duration = Duration::from_millis(0);
     }
 
     pub fn reset(&mut self) {
