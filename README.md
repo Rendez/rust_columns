@@ -10,6 +10,8 @@ You can run the game simply with:
 $ cargo run
 ```
 
+[![asciicast](https://asciinema.org/a/SaKyJdXfD3jKZh67SBC4mrrAe.svg)](https://asciinema.org/a/SaKyJdXfD3jKZh67SBC4mrrAe)
+
 ### Working terminals
 
 Under the hood, all this library is using is the crate `crossterm`, therefore the same support applies:
