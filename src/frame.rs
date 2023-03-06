@@ -1,9 +1,28 @@
-use crate::{NUM_COLS, NUM_ROWS};
+use crossterm::style::Color;
 
-pub type Frame = [[i8; NUM_ROWS]; NUM_COLS];
+use crate::{NUM_COLS, NUM_ROWS, PIT_STARTING_X};
+
+#[derive(Clone, Copy, PartialEq)]
+pub struct Pixel {
+    pub grapheme: char,
+    pub color: Color,
+    pub background: Color,
+}
+
+impl Default for Pixel {
+    fn default() -> Self {
+        Self {
+            grapheme: ' ',
+            color: Color::Black,
+            background: Color::Black,
+        }
+    }
+}
+
+pub type Frame = [[Pixel; NUM_ROWS]; NUM_COLS + PIT_STARTING_X];
 
 pub fn new_frame() -> Frame {
-    [[-1; NUM_ROWS]; NUM_COLS]
+    [[Pixel::default(); NUM_ROWS]; NUM_COLS + PIT_STARTING_X]
 }
 
 pub trait Drawable {

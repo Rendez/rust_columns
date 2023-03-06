@@ -23,6 +23,7 @@ impl Timer {
 
     pub fn finish(&mut self) {
         self.duration = Duration::from_millis(0);
+        self.ready = true;
     }
 
     pub fn reset(&mut self) {
@@ -44,5 +45,7 @@ mod test {
         assert!(timer.ready);
         timer.reset();
         assert!(!timer.ready);
+        timer.finish();
+        assert!(timer.ready);
     }
 }

@@ -1,11 +1,14 @@
+use crate::frame::Pixel;
+use crossterm::style::Color;
+
+const BLOCK_CHAR: char = '▓';
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BlockKind {
-    Blue,
     Yellow,
-    Green,
+    Orange,
     Red,
     Cyan,
-    Magenta,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -22,13 +25,37 @@ impl Block {
         }
     }
 
-    pub fn numbered(&self) -> i8 {
+    pub fn to_pixel(&self) -> Pixel {
+        use BlockKind::*;
         if self.exploding {
-            return 6;
+            return Pixel {
+                grapheme: '*',
+                color: Color::White,
+                background: Color::Black,
+            };
         }
         match self.kind {
-            Some(kind) => kind as i8,
-            None => -1,
+            Some(Yellow) => Pixel {
+                grapheme: BLOCK_CHAR,
+                color: Color::AnsiValue(226),
+                ..Pixel::default()
+            },
+            Some(Orange) => Pixel {
+                grapheme: BLOCK_CHAR,
+                color: Color::AnsiValue(214),
+                ..Pixel::default()
+            },
+            Some(Red) => Pixel {
+                grapheme: BLOCK_CHAR,
+                color: Color::AnsiValue(196),
+                ..Pixel::default()
+            },
+            Some(Cyan) => Pixel {
+                grapheme: BLOCK_CHAR,
+                color: Color::AnsiValue(51),
+                ..Pixel::default()
+            },
+            None => Pixel::default(),
         }
     }
 

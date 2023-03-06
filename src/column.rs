@@ -5,7 +5,7 @@ use crate::{
     frame::{Drawable, Frame},
     pit::Heap,
     timer::Timer,
-    Vec2, NUM_COLS, NUM_ROWS, STARTING_X, STARTING_Y,
+    Vec2, NUM_COLS, NUM_ROWS, PIT_STARTING_X, STARTING_X, STARTING_Y,
 };
 use rand::{distributions::Uniform, thread_rng, Rng};
 
@@ -18,6 +18,7 @@ pub struct Column {
     y: usize,
     dropping: bool,
     move_timer: Timer,
+    pub stand_by: bool,
 }
 
 impl Column {
@@ -25,16 +26,14 @@ impl Column {
 
     pub fn new() -> Self {
         let blocks = thread_rng()
-            .sample_iter(Uniform::<u8>::new_inclusive(1, 6))
+            .sample_iter(Uniform::<u8>::new_inclusive(1, 4))
             .take(3)
             .map(|index| -> Block {
                 let kind = match index {
-                    1 => Some(BlockKind::Blue),
-                    2 => Some(BlockKind::Yellow),
-                    3 => Some(BlockKind::Green),
-                    4 => Some(BlockKind::Red),
-                    5 => Some(BlockKind::Cyan),
-                    6 => Some(BlockKind::Magenta),
+                    1 => Some(BlockKind::Yellow),
+                    2 => Some(BlockKind::Orange),
+                    3 => Some(BlockKind::Red),
+                    4 => Some(BlockKind::Cyan),
                     _ => None,
                 };
                 Block::new(kind)
@@ -131,6 +130,7 @@ impl Default for Column {
             x: STARTING_X,
             y: STARTING_Y,
             dropping: true,
+            stand_by: false,
             move_timer: Timer::from_millis(Column::MOVE_MILLIS),
         }
     }
@@ -141,12 +141,17 @@ impl Drawable for Column {
         // Since it's already transfered to the heap of blocks,
         // we do not want to draw it on top unless it's still moving
         if self.dropping {
+            let (x, y) = if self.stand_by {
+                (PIT_STARTING_X - 2, 3)
+            } else {
+                (self.x + PIT_STARTING_X, self.y)
+            };
             for (i, block) in self.shaft.iter().rev().enumerate() {
-                if i > self.y {
+                if i > y {
                     // since it starts at y=0, do not draw the first two blocks as they would have negative y's
                     break;
                 }
-                frame[self.x][self.y - i] = block.numbered();
+                frame[x][y - i] = block.to_pixel();
             }
         }
     }
@@ -225,7 +230,7 @@ mod test {
 
         assert_eq!(col.detect_landing(&mut heap, DELTA), None);
 
-        heap[STARTING_X][STARTING_Y + 1] = Block::new(Some(BlockKind::Blue));
+        heap[STARTING_X][STARTING_Y + 1] = Block::new(Some(BlockKind::Cyan));
 
         assert_eq!(
             col.detect_landing(&mut heap, DELTA),

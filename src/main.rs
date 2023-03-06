@@ -3,6 +3,7 @@ use crossterm::{
     Result,
 };
 use rust_columns::{
+    board::Board,
     column::Column,
     frame::{new_frame, Drawable, Frame},
     pit::Pit,
@@ -24,7 +25,7 @@ fn main() -> Result<()> {
     thread::spawn(move || -> Result<()> {
         let mut stdout = io::stdout();
         let mut last_frame = new_frame();
-        renderer::init(&mut stdout, &last_frame)?;
+        renderer::init(&mut stdout)?;
         while let Ok(curr_frame) = render_rx.recv() {
             renderer::render(&mut stdout, &last_frame, &curr_frame)?;
             last_frame = curr_frame;
@@ -33,10 +34,12 @@ fn main() -> Result<()> {
     });
 
     let fps_duration = Duration::from_nanos(1_000_000_000 / 60); // 60 fps duration ~16ms
+    let mut instant = Instant::now();
+    let mut board = Board::default();
+    let mut pit = Pit::default();
     let mut column = Column::new();
     let mut upcoming_column = Column::new();
-    let mut pit = Pit::new();
-    let mut instant = Instant::now();
+    upcoming_column.stand_by = true;
 
     'gameloop: loop {
         let delta = instant.elapsed();
@@ -66,15 +69,25 @@ fn main() -> Result<()> {
             }
         }
 
-        pit.update(&mut column, delta);
-        if pit.stable() && !column.update(&pit.heap, delta) {
-            column = upcoming_column;
-            upcoming_column = Column::new();
+        let (score, blocks_score) = pit.update(&mut column, delta);
+        // move column down if dropping, otherwise create a new one
+        if pit.stable() {
+            let dropping = column.update(&pit.heap, delta);
+            // if the column landed already, renew it
+            if !dropping {
+                column = upcoming_column;
+                column.stand_by = false;
+                upcoming_column = Column::new();
+                upcoming_column.stand_by = true;
+            }
         }
-
+        // keep track of scores, etc. in the board
+        board.update(score, blocks_score);
         // draw elements on the current frame
+        board.draw(&mut curr_frame);
         pit.draw(&mut curr_frame);
         column.draw(&mut curr_frame);
+        upcoming_column.draw(&mut curr_frame);
         // render
         render_tx
             .send(curr_frame)

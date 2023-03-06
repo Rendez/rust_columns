@@ -1,4 +1,5 @@
 pub mod block;
+pub mod board;
 pub mod column;
 pub mod frame;
 pub mod pit;
@@ -8,6 +9,8 @@ pub mod timer;
 
 const NUM_COLS: usize = 6;
 const NUM_ROWS: usize = 13;
+const PIT_STARTING_X: usize = 10;
+const WIDTH: usize = NUM_COLS + PIT_STARTING_X;
 const STARTING_X: usize = 2;
 const STARTING_Y: usize = 0;
 
