@@ -2,8 +2,9 @@ use crate::{
     block::{Block, BlockKind},
     column::Column,
     frame::{Drawable, Frame},
+    point,
     timer::Timer,
-    Vec2, NUM_COLS, NUM_ROWS, PIT_STARTING_X,
+    Point, NUM_COLS, NUM_ROWS, PIT_STARTING_X,
 };
 use std::time::Duration;
 use std::{cmp::min, slice::Iter};
@@ -54,14 +55,10 @@ impl PitState {
     const MOVE_MILLIS: u64 = 1000;
     pub const SCORE_MUL: usize = 10;
 
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn update_dropping_at<const R: usize, const C: usize>(
         &self,
         heap: &mut [[Block; R]; C],
-        origins: &mut [Vec2],
+        origins: &mut [Point],
     ) -> bool {
         let mut something_dropped = false;
         // drop all active blocks one step if they have a slot for that
@@ -80,14 +77,11 @@ impl PitState {
         something_dropped
     }
 
-    /*
-     *
-     */
     pub fn collect_dropping_at<const R: usize, const C: usize>(
         &self,
         heap: &[[Block; R]; C],
-        origins: &[Vec2],
-    ) -> Vec<Vec2> {
+        origins: &[Point],
+    ) -> Vec<Point> {
         let mut items = Vec::new();
 
         for origin in origins {
@@ -95,7 +89,7 @@ impl PitState {
                 if heap[origin.x][y].empty() {
                     break;
                 }
-                items.push(Vec2::xy(origin.x, y));
+                items.push(point!(origin.x, y));
             }
         }
 
@@ -108,9 +102,9 @@ impl PitState {
     pub fn collect_matching_at<const R: usize, const C: usize>(
         &self,
         heap: &[[Block; R]; C],
-        origins: &[Vec2],
+        origins: &[Point],
         partial_score: &mut usize,
-    ) -> Vec<Vec2> {
+    ) -> Vec<Point> {
         let mut items = Vec::new();
         let mut cache = [[false; R]; C];
 
@@ -132,16 +126,15 @@ impl PitState {
     fn matching_at<const R: usize, const C: usize>(
         &self,
         heap: &[[Block; R]; C],
-        origin: &Vec2,
-    ) -> (Vec<Vec2>, usize) {
+        origin: &Point,
+    ) -> (Vec<Point>, usize) {
         let mut items = Vec::new();
         let mut matched_axes = 0;
         let origin_item = heap[origin.x][origin.y];
 
         if !origin_item.empty() {
             for axis in CardinalAxis::iter() {
-                // CardinalAxis.iter()
-                let mut matches: Vec<Vec2> = Vec::new();
+                let mut matches: Vec<Point> = Vec::new();
 
                 match axis {
                     CardinalAxis::NxS => {
@@ -150,14 +143,14 @@ impl PitState {
                             if heap[origin.x][y] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x, y));
+                            matches.push(point!(origin.x, y));
                         }
                         // south (S)
                         for y in (origin.y + 1)..R {
                             if heap[origin.x][y] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x, y));
+                            matches.push(point!(origin.x, y));
                         }
                     }
                     CardinalAxis::ExW => {
@@ -166,7 +159,7 @@ impl PitState {
                             if heap[x][origin.y] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(x, origin.y));
+                            matches.push(point!(x, origin.y));
                         }
                         // east (E)
                         #[allow(clippy::needless_range_loop)]
@@ -174,7 +167,7 @@ impl PitState {
                             if heap[x][origin.y] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(x, origin.y));
+                            matches.push(point!(x, origin.y));
                         }
                     }
                     CardinalAxis::NExSW => {
@@ -183,14 +176,14 @@ impl PitState {
                             if heap[origin.x + i][origin.y - i] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x + i, origin.y - i));
+                            matches.push(point!(origin.x + i, origin.y - i));
                         }
                         // southwest (SW)
                         for i in 1..min(R - origin.y, origin.x + 1) {
                             if heap[origin.x - i][origin.y + i] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x - i, origin.y + i));
+                            matches.push(point!(origin.x - i, origin.y + i));
                         }
                     }
                     CardinalAxis::NWxSE => {
@@ -199,14 +192,14 @@ impl PitState {
                             if heap[origin.x - i][origin.y - i] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x - i, origin.y - i));
+                            matches.push(point!(origin.x - i, origin.y - i));
                         }
                         // southeast (SE)
                         for i in 1..min(C - origin.x, R - origin.y) {
                             if heap[origin.x + i][origin.y + i] != origin_item {
                                 break;
                             }
-                            matches.push(Vec2::xy(origin.x + i, origin.y + i));
+                            matches.push(point!(origin.x + i, origin.y + i));
                         }
                     }
                 }
@@ -228,7 +221,7 @@ impl PitState {
 pub struct Pit {
     pub heap: Heap,
     state: PitState,
-    active_origins: Vec<Vec2>,
+    active_origins: Vec<Point>,
     score: usize,
     blocks_score: usize,
 }
@@ -238,7 +231,7 @@ impl Default for Pit {
         Self {
             heap: Self::new_heap(None),
             active_origins: Vec::new(),
-            state: PitState::new(),
+            state: PitState::default(),
             score: 0,
             blocks_score: 0,
         }
@@ -300,27 +293,21 @@ impl Pit {
                     } else {
                         Dropping
                     };
-                } else {
-                    self.state.move_timer.update(delta);
+                } else if self.state.move_timer.update(delta).ready() {
+                    self.state.move_timer.reset();
+                    self.state.times += 1;
 
-                    if self.state.move_timer.ready {
-                        self.state.move_timer.reset();
-                        self.state.times += 1;
+                    if !self.active_origins.is_empty() {
+                        let exploding = self.state.times % 2 != 0;
 
-                        if !self.active_origins.is_empty() {
-                            let exploding = self.state.times % 2 != 0;
-
-                            for item in self.active_origins.iter() {
-                                self.heap[item.x][item.y].exploding = exploding;
-                            }
+                        for item in self.active_origins.iter() {
+                            self.heap[item.x][item.y].exploding = exploding;
                         }
                     }
                 }
             }
             Dropping => {
-                self.state.move_timer.update(delta);
-
-                if self.state.move_timer.ready {
+                if self.state.move_timer.update(delta).ready() {
                     self.state.move_timer.reset();
 
                     if !self
@@ -419,10 +406,10 @@ mod test {
             // │ │ │ │
             // └─┴─┴─┘
             //
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut heap: [[Block; 3]; 3] = Pit::new_heap(None);
-            let origins = [Vec2::xy(0, 0), Vec2::xy(0, 1)];
-            for origin in origins {
+            let origins = [point!(0, 0), point!(0, 1)];
+            for origin in origins.iter() {
                 heap[origin.x][origin.y] = Block::new(Some(BlockKind::Cyan));
             }
             let items = pit_state.collect_matching_at(&heap, &origins, &mut 0);
@@ -439,21 +426,21 @@ mod test {
             // ├─┼─┼─┤
             // │▒│ │ │
             // └─┴─┴─┘
-            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Vec2]| {
+            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Point]| {
                 let items = pit_state.collect_matching_at(heap, origins, &mut 0);
 
                 assert_eq!(items.len(), 3);
 
                 for origin in origins {
                     assert!(items.contains(origin));
-                    assert!(items.contains(&Vec2::xy(origin.x, (origin.y + 1) % 3)));
-                    assert!(items.contains(&Vec2::xy(origin.x, (origin.y + 2) % 3)));
+                    assert!(items.contains(&point!(origin.x, (origin.y + 1) % 3)));
+                    assert!(items.contains(&point!(origin.x, (origin.y + 2) % 3)));
                 }
             };
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut heap = Pit::new_heap(None);
-            let origins = [Vec2::xy(0, 0), Vec2::xy(0, 1), Vec2::xy(0, 2)];
-            for origin in origins {
+            let origins = [point!(0, 0), point!(0, 1), point!(0, 2)];
+            for origin in origins.iter() {
                 heap[origin.x][origin.y] = Block::new(Some(BlockKind::Cyan));
             }
 
@@ -469,21 +456,21 @@ mod test {
             // ├─┼─┼─┤
             // │ │ │ │
             // └─┴─┴─┘
-            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Vec2]| {
+            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Point]| {
                 let items = pit_state.collect_matching_at(heap, origins, &mut 0);
 
                 assert_eq!(items.len(), 3);
 
                 for origin in origins {
                     assert!(items.contains(origin));
-                    assert!(items.contains(&Vec2::xy((origin.x + 1) % 3, origin.y)));
-                    assert!(items.contains(&Vec2::xy((origin.x + 2) % 3, origin.y)));
+                    assert!(items.contains(&point!((origin.x + 1) % 3, origin.y)));
+                    assert!(items.contains(&point!((origin.x + 2) % 3, origin.y)));
                 }
             };
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut heap = Pit::new_heap(None);
-            let origins = [Vec2::xy(0, 1), Vec2::xy(1, 1), Vec2::xy(2, 1)];
-            for origin in origins {
+            let origins = [point!(0, 1), point!(1, 1), point!(2, 1)];
+            for origin in origins.iter() {
                 heap[origin.x][origin.y] = Block::new(Some(BlockKind::Cyan));
             }
 
@@ -499,21 +486,21 @@ mod test {
             // ├─┼─┼─┤
             // │ │ │▒│
             // └─┴─┴─┘
-            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Vec2]| {
+            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Point]| {
                 let items = pit_state.collect_matching_at(heap, origins, &mut 0);
 
                 assert_eq!(items.len(), 3);
 
                 for origin in origins {
                     assert!(items.contains(origin));
-                    assert!(items.contains(&Vec2::xy((origin.x + 1) % 3, (origin.y + 1) % 3)));
-                    assert!(items.contains(&Vec2::xy((origin.x + 2) % 3, (origin.y + 2) % 3)));
+                    assert!(items.contains(&point!((origin.x + 1) % 3, (origin.y + 1) % 3)));
+                    assert!(items.contains(&point!((origin.x + 2) % 3, (origin.y + 2) % 3)));
                 }
             };
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut heap = Pit::new_heap(None);
-            let origins = [Vec2::xy(0, 0), Vec2::xy(1, 1), Vec2::xy(2, 2)];
-            for origin in origins {
+            let origins = [point!(0, 0), point!(1, 1), point!(2, 2)];
+            for origin in origins.iter() {
                 heap[origin.x][origin.y] = Block::new(Some(BlockKind::Cyan));
             }
 
@@ -531,21 +518,21 @@ mod test {
             // │▒│ │ │
             // └─┴─┴─┘
             //
-            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Vec2]| {
+            let assert_items = |pit_state: &PitState, heap: &Heap, origins: &[Point]| {
                 let items = pit_state.collect_matching_at(heap, origins, &mut 0);
 
                 assert_eq!(items.len(), 3);
 
                 for origin in origins {
                     assert!(items.contains(origin));
-                    assert!(items.contains(&Vec2::xy((origin.x + 1) % 3, (origin.y + 2) % 3)));
-                    assert!(items.contains(&Vec2::xy((origin.x + 2) % 3, (origin.y + 1) % 3)));
+                    assert!(items.contains(&point!((origin.x + 1) % 3, (origin.y + 2) % 3)));
+                    assert!(items.contains(&point!((origin.x + 2) % 3, (origin.y + 1) % 3)));
                 }
             };
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut heap = Pit::new_heap(None);
-            let origins = [Vec2::xy(2, 0), Vec2::xy(1, 1), Vec2::xy(0, 2)];
-            for origin in origins {
+            let origins = [point!(2, 0), point!(1, 1), point!(0, 2)];
+            for origin in origins.iter() {
                 heap[origin.x][origin.y] = Block::new(Some(BlockKind::Orange));
             }
 
@@ -558,9 +545,9 @@ mod test {
             let assert_items_for_matches = |
                 pit_state: &PitState,
                 heap: &Heap,
-                origins: &[Vec2],
-                matches: &[Vec2; 6]
-            | -> Vec<Vec2> {
+                origins: &[Point],
+                matches: &[Point; 6]
+            | -> Vec<Point> {
                 let mut partial_score = 0;
                 let items = pit_state.collect_matching_at(heap, origins, &mut partial_score);
 
@@ -577,9 +564,9 @@ mod test {
                 items
             };
 
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let heap = Pit::new_heap(Some(BlockKind::Cyan));
-            let origins = [Vec2::xy(0, 0), Vec2::xy(2, 2)];
+            let origins = [point!(0, 0), point!(2, 2)];
             let matches = [
                 // ┌─┬─┬─┐
                 // │▓│▒│▒│
@@ -589,12 +576,12 @@ mod test {
                 // │▒│░│▒│
                 // └─┴─┴─┘
                 [
-                    Vec2::xy(1, 0),
-                    Vec2::xy(2, 0),
-                    Vec2::xy(0, 1),
-                    Vec2::xy(0, 2),
-                    Vec2::xy(1, 1),
-                    Vec2::xy(2, 2),
+                    point!(1, 0),
+                    point!(2, 0),
+                    point!(0, 1),
+                    point!(0, 2),
+                    point!(1, 1),
+                    point!(2, 2),
                 ],
                 // ┌─┬─┬─┐
                 // │▒│░│▒│
@@ -604,12 +591,12 @@ mod test {
                 // │▒│▒│▓│
                 // └─┴─┴─┘
                 [
-                    Vec2::xy(0, 0),
-                    Vec2::xy(2, 0),
-                    Vec2::xy(1, 1),
-                    Vec2::xy(2, 2),
-                    Vec2::xy(0, 2),
-                    Vec2::xy(1, 2),
+                    point!(0, 0),
+                    point!(2, 0),
+                    point!(1, 1),
+                    point!(2, 2),
+                    point!(0, 2),
+                    point!(1, 2),
                 ],
             ];
 
@@ -627,18 +614,18 @@ mod test {
     mod test_collect_dropping {
         use super::*;
 
-        fn create_and_populate_heap_for_dropping() -> (Heap, [Vec2; 5], [Vec2; 2]) {
+        fn create_and_populate_heap_for_dropping() -> (Heap, [Point; 5], [Point; 2]) {
             let mut heap: [[Block; 3]; 3] = Pit::new_heap(None);
             let origins = [
-                Vec2::xy(0, 0),
-                Vec2::xy(0, 1),
-                Vec2::xy(1, 1),
-                Vec2::xy(2, 1),
-                Vec2::xy(2, 2),
+                point!(0, 0),
+                point!(0, 1),
+                point!(1, 1),
+                point!(2, 1),
+                point!(2, 2),
             ];
-            let cyan = [Vec2::xy(1, 0), Vec2::xy(2, 0)];
-            let orange = [Vec2::xy(0, 2), Vec2::xy(1, 2)];
-            let dropping = [Vec2::xy(1, 0), Vec2::xy(2, 0)];
+            let cyan = [point!(1, 0), point!(2, 0)];
+            let orange = [point!(0, 2), point!(1, 2)];
+            let dropping = [point!(1, 0), point!(2, 0)];
 
             for origin in cyan {
                 heap[origin.x][origin.y].update(Some(BlockKind::Cyan));
@@ -659,7 +646,7 @@ mod test {
             // │▒│▒│*│
             // └─┴─┴─┘
             let (heap, origins, dropping) = create_and_populate_heap_for_dropping();
-            let items = PitState::new().collect_dropping_at(&heap, &origins);
+            let items = PitState::default().collect_dropping_at(&heap, &origins);
 
             for item in dropping {
                 assert!(items.contains(&item));
@@ -676,7 +663,7 @@ mod test {
             // │▒│▒│*│
             // └─┴─┴─┘
             let (mut heap, _, mut dropping) = create_and_populate_heap_for_dropping();
-            let pit_state = PitState::new();
+            let pit_state = PitState::default();
             let mut drop_times = 0;
 
             loop {

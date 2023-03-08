@@ -1,21 +1,23 @@
-use std::time::Duration;
-
 use crate::{
     block::{Block, BlockKind},
     frame::{Drawable, Frame},
     pit::Heap,
+    point,
     timer::Timer,
-    Vec2, NUM_COLS, NUM_ROWS, PIT_STARTING_X, STARTING_X, STARTING_Y,
+    Point, NUM_COLS, NUM_ROWS, PIT_STARTING_X,
 };
 use rand::{distributions::Uniform, thread_rng, Rng};
+use std::time::Duration;
 
 type Shaft = [Block; 3];
+
+const STARTING_X: usize = 2;
+const STARTING_Y: usize = 0;
 
 #[derive(Debug)]
 pub struct Column {
     shaft: Shaft,
-    x: usize,
-    y: usize,
+    pos: Point,
     dropping: bool,
     move_timer: Timer,
     pub stand_by: bool,
@@ -58,42 +60,41 @@ impl Column {
 
     pub fn move_down(&mut self, heap: &Heap) {
         if !self.detect_hit_downwards(heap) {
-            self.y += 1;
+            self.pos.y += 1;
         }
     }
 
     pub fn move_left(&mut self, heap: &Heap) {
         if !self.detect_hit_leftwards(heap) {
-            self.x -= 1;
+            self.pos.x -= 1;
         }
     }
 
     pub fn move_right(&mut self, heap: &Heap) {
         if !self.detect_hit_rightwards(heap) {
-            self.x += 1;
+            self.pos.x += 1;
         }
     }
 
-    pub fn detect_landing(&mut self, heap: &mut Heap, delta: Duration) -> Option<Vec<Vec2>> {
+    pub fn detect_landing(&mut self, heap: &mut Heap, delta: Duration) -> Option<Vec<Point>> {
         if self.detect_hit_downwards(heap) {
             // reached the bottom of the pit or there is a upcoming hit with an existing block
             let mut move_timer_copy = self.move_timer;
-            move_timer_copy.update(delta);
             // we will be ready when the timer finishes, to give the player
             // the chance to cycle the column before we have fully landed
-            if move_timer_copy.ready {
+            if move_timer_copy.update(delta).ready() {
                 // now that we have landed, we copy the blocks into our matrix of blocks
                 self.dropping = false;
                 // transfer shaft block to heap of blocks
                 let mut origins = Vec::new();
                 for (i, block) in self.shaft.into_iter().rev().enumerate() {
-                    if i > self.y {
+                    if i > self.pos.y {
                         // y points to the base block, if any above it are out of the matrix, stop transfer to teh heap.
                         break;
                     }
-                    let origin = Vec2::xy(self.x, self.y - i);
-                    heap[origin.x][origin.y] = block;
-                    origins.push(origin);
+                    let block_origin = point!(self.pos.x, self.pos.y - i);
+                    heap[block_origin.x][block_origin.y] = block;
+                    origins.push(block_origin);
                 }
                 return Some(origins);
             }
@@ -102,8 +103,7 @@ impl Column {
     }
 
     pub fn update(&mut self, heap: &Heap, delta: Duration) -> bool {
-        self.move_timer.update(delta);
-        if self.move_timer.ready {
+        if self.move_timer.update(delta).ready() {
             self.move_timer.reset();
             self.move_down(heap);
         }
@@ -111,15 +111,15 @@ impl Column {
     }
 
     fn detect_hit_downwards(&self, heap: &Heap) -> bool {
-        self.dropping && (self.y == NUM_ROWS - 1 || !heap[self.x][self.y + 1].empty())
+        self.dropping && (self.pos.y == NUM_ROWS - 1 || !heap[self.pos.x][self.pos.y + 1].empty())
     }
 
     fn detect_hit_leftwards(&self, heap: &Heap) -> bool {
-        self.dropping && (self.x == 0 || !heap[self.x - 1][self.y].empty())
+        self.dropping && (self.pos.x == 0 || !heap[self.pos.x - 1][self.pos.y].empty())
     }
 
     fn detect_hit_rightwards(&self, heap: &Heap) -> bool {
-        self.dropping && (self.x == NUM_COLS - 1 || !heap[self.x + 1][self.y].empty())
+        self.dropping && (self.pos.x == NUM_COLS - 1 || !heap[self.pos.x + 1][self.pos.y].empty())
     }
 }
 
@@ -127,8 +127,7 @@ impl Default for Column {
     fn default() -> Self {
         Self {
             shaft: [Block::default(), Block::default(), Block::default()],
-            x: STARTING_X,
-            y: STARTING_Y,
+            pos: point!(STARTING_X, STARTING_Y),
             dropping: true,
             stand_by: false,
             move_timer: Timer::from_millis(Column::MOVE_MILLIS),
@@ -144,7 +143,7 @@ impl Drawable for Column {
             let (x, y) = if self.stand_by {
                 (PIT_STARTING_X - 2, 3)
             } else {
-                (self.x + PIT_STARTING_X, self.y)
+                (self.pos.x + PIT_STARTING_X, self.pos.y)
             };
             for (i, block) in self.shaft.iter().rev().enumerate() {
                 if i > y {
@@ -159,14 +158,13 @@ impl Drawable for Column {
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
-
     use crate::{
         block::{Block, BlockKind},
-        column::Column,
+        column::{Column, STARTING_X, STARTING_Y},
         pit::{Heap, Pit},
-        Vec2, NUM_ROWS, STARTING_X, STARTING_Y,
+        point, Point, NUM_ROWS,
     };
+    use std::time::Duration;
 
     const DELTA: Duration = Duration::from_millis(Column::MOVE_MILLIS);
 
@@ -174,8 +172,8 @@ mod test {
     fn test_new() {
         let col = Column::new();
 
-        assert_eq!(col.x, STARTING_X);
-        assert_eq!(col.y, STARTING_Y);
+        assert_eq!(col.pos.x, STARTING_X);
+        assert_eq!(col.pos.y, STARTING_Y);
         assert!(col.dropping);
 
         const MAX_COUNT: u8 = 5;
@@ -218,9 +216,9 @@ mod test {
         let mut col = Column::new();
 
         col.update(&heap, Duration::from_millis(Column::MOVE_MILLIS - 1));
-        assert_eq!(col.y, 0);
+        assert_eq!(col.pos.y, 0);
         col.update(&heap, Duration::from_millis(1));
-        assert_eq!(col.y, 1);
+        assert_eq!(col.pos.y, 1);
     }
 
     #[test]
@@ -234,7 +232,7 @@ mod test {
 
         assert_eq!(
             col.detect_landing(&mut heap, DELTA),
-            Some(vec![Vec2::xy(STARTING_X, STARTING_Y)])
+            Some(vec![point!(STARTING_X, STARTING_Y)])
         );
     }
 
@@ -252,9 +250,9 @@ mod test {
         assert_eq!(
             col.detect_landing(&mut heap, DELTA),
             Some(vec![
-                Vec2::xy(STARTING_X, NUM_ROWS - 1),
-                Vec2::xy(STARTING_X, NUM_ROWS - 2),
-                Vec2::xy(STARTING_X, NUM_ROWS - 3)
+                point!(STARTING_X, NUM_ROWS - 1),
+                point!(STARTING_X, NUM_ROWS - 2),
+                point!(STARTING_X, NUM_ROWS - 3)
             ])
         );
     }

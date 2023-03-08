@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     let mut _t = terminal::TerminalGuard::create();
     // Render loop in a separate thread
     let (render_tx, render_rx) = mpsc::channel::<Frame>();
-    thread::spawn(move || -> Result<()> {
+    let render_handle = thread::spawn(move || -> Result<()> {
         let mut stdout = io::stdout();
         let mut last_frame = new_frame();
         renderer::init(&mut stdout)?;
@@ -95,12 +95,15 @@ fn main() -> Result<()> {
 
         if pit.topped_up() {
             // lose game
-            thread::sleep(Duration::from_secs(1));
             break;
         }
 
         thread::sleep(fps_duration.saturating_sub(instant.elapsed()));
     }
+
+    // Hygene
+    drop(render_tx);
+    render_handle.join().unwrap()?;
 
     Ok(())
 }

@@ -1,10 +1,9 @@
-use std::io;
-
 use crossterm::{
     cursor::{Hide, Show},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
+use std::io;
 
 /// Failure-guarded setup and cleanup for the terminal.
 ///
