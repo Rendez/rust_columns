@@ -1,0 +1,58 @@
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install Stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Toolchain Info
+        run: |
+          rustup 1.25.2 --version
+          cargo --version --verbose
+          rustc --version
+          cargo clippy --version
+
+      - name: Conventional Commits
+        run: |
+          cargo install --locked cocogitto
+          cog check --from-latest-tag
+
+      - name: Lint
+        run: |
+          cargo fmt --check
+          cargo clippy
+
+      - name: Test
+        run: |
+          cargo check --locked
+          cargo test
+
+  build:
+    needs: precheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build Default Target
+        run: |
+          cargo build --release
