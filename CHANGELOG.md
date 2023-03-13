@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [0.1.1](https://github.com/rendez/rust_columns/compare/0.1.0..0.1.1) - 2023-03-13
+#### Bug Fixes
+- github CI workflows for release and PR checks (#2) - ([c3b858c](https://github.com/rendez/rust_columns/commit/c3b858ccb7d9344b5b1269acd95b6f55cd2cc773)) - [@rendez](https://github.com/rendez)
+
+- - -
+
 ## [v0.1.0](https://github.com/rendez/rust_columns/compare/1bff133139b33329ad6dea46aa9e572c619d1a56..v0.1.0) - 2023-03-13
 #### Bug Fixes
 - tagging to follow conventional commit spec - ([570c03c](https://github.com/rendez/rust_columns/commit/570c03c2d22e8b157ad12a38926bc5284d055618)) - [@rendez](https://github.com/rendez)
