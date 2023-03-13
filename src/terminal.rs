@@ -5,12 +5,7 @@ use crossterm::{
 };
 use std::io;
 
-/// Failure-guarded setup and cleanup for the terminal.
-///
-/// Example:
-/// ```
-/// let mut _t = TerminalGuard::create();
-/// ```
+// Failure-guarded setup and cleanup for the terminal.
 pub struct TerminalGuard;
 
 impl TerminalGuard {

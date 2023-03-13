@@ -1,0 +1,58 @@
+name: Bump version and release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install Stable Minimal
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Git User Setup
+        run: |
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
+      - name: Conventional Commits
+        run: |
+          cargo install --locked cocogitto
+          cog check --from-latest-tag
+
+      - name: Bump Package Version
+        run: |
+          cog bump --auto || exit 0
+
+      - name: Update Cargo.toml Version
+        id: versioning
+        run: |
+          version=$(git describe --tags "$(git rev-list --tags --max-count=1)")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          sed -ri "s/version = \"(([0-9]+\.)*[0-9]+)\"/version = \"$version\"/" Cargo.toml
+          git add Cargo.toml
+          git commit --amend --no-edit
+
+      - name: Push
+        run: |
+          git push origin --tags
+          git push origin
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          tag_name: ${{ steps.versioning.outputs.version }}
+          token: ${{ secrets.PAT }}
