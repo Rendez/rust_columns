@@ -1,6 +1,6 @@
 [package]
 name = "rust_columns"
-version = "0.0.0"
+version = "0.1.0"
 authors = [ "Luis Merino <mail@luismerino.name> "]
 edition = "2021"
 description = "Open source terminal arcade game with audio - based off of the classic Sega 'Columns'"
